@@ -5,6 +5,8 @@ import org.llm4s.metrics.{ MetricsCollector, PrometheusEndpoint }
 import org.llm4s.types.Result
 import pureconfig.ConfigSource
 
+import scala.util.Try
+
 /**
  * Application-edge configuration loader for LLM4S.
  *
@@ -235,10 +237,16 @@ object Llm4sConfig {
    *         when `EMBEDDING_MODEL` is absent or unrecognised.
    */
   def loadTextEmbeddingModel(): Result[TextEmbeddingModelSettings] =
-    org.llm4s.config.EmbeddingsConfigLoader.loadProvider(ConfigSource.default).map { case (provider, cfg) =>
-      val p    = provider.toLowerCase
-      val dims = ModelDimensionRegistry.getDimension(p, cfg.model)
-      TextEmbeddingModelSettings(provider = p, modelName = cfg.model, dimensions = dims)
+    org.llm4s.config.EmbeddingsConfigLoader.loadProvider(ConfigSource.default).flatMap { case (provider, cfg) =>
+      val p = provider.toLowerCase
+
+      Try(ModelDimensionRegistry.getDimension(p, cfg.model)).toEither.left.map { err =>
+        ConfigurationError(
+          s"Unknown embedding model '${cfg.model}' for provider '$provider': ${err.getMessage}"
+        )
+      }.map { dims =>
+        TextEmbeddingModelSettings(provider = p, modelName = cfg.model, dimensions = dims)
+      }
     }
 
   /** Alias for [[loadTextEmbeddingModel]]. */

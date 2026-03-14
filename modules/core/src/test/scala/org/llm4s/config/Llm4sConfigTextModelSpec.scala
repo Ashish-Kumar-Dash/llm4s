@@ -47,5 +47,21 @@ class Llm4sConfigTextModelSpec extends AnyWordSpec with Matchers {
         pure.dimensions shouldBe expectedDims
       }
     }
+
+    "return a ConfigurationError when the configured embedding model is unknown" in {
+      val props = Map(
+        "llm4s.embeddings.provider"       -> "openai",
+        "llm4s.embeddings.openai.baseUrl" -> "https://example.com/v1",
+        "llm4s.embeddings.openai.model"   -> "text-embedding-unknown",
+        // API key is shared with core OpenAI config keys
+        "llm4s.openai.apiKey" -> "sk-test"
+      )
+
+      withProps(props) {
+        val result = Llm4sConfig.textEmbeddingModel()
+        result.isLeft shouldBe true
+        result.left.toOption.get.message should include("Unknown embedding model")
+      }
+    }
   }
 }
